@@ -79,23 +79,21 @@ In a nutshell, this application allows you to embed Gladly Sidekick on your fron
 2. In a new tab, go to the Sidekick preview link you generated in Step 2.3 and start a chat session:
 ![](./tutorial-images/chat-session.png)
 3. You will then receive an automated response with the following text. This is a message sent by the app!
-![](./tutorial-images/automated-chat.png)
+![](./tutorial-images/chatbot-default-response.png)
 4. Find the conversation in Gladly by typing in the email address you used to start the chat session on the preview link. Note that the agent you configured in Step 2.7 is assigned to the conversation!
 ![](./tutorial-images/chatbot-agent-response.png)
 ![](./tutorial-images/chatbot-agent-assignment.png)
-5. Go back to the chat preview link. Type in anything you'd like (e.g.: `help`). The chat widget will reply with a message that looks like this: `Thank you for contacting us. Reply "agent" to be directed to an agent. Reply "goodbye" to close this chat session. Reply "show me quick reply buttons" to see quick reply buttons.`
-![](./tutorial-images/chatbot-default-response.png)
-6. Type in `show me quick reply buttons`. The chat widget will respond with a list of options in button format.
+5. Type in `show me quick reply buttons`. The chat widget will respond with a list of options in button format.
 ![](./tutorial-images/chatbot-quick-replies.png)
-7. Press `goodbye`. You will receive a chat ended notification.
+6. Press `goodbye`. You will receive a chat ended notification.
 ![](./tutorial-images/chatbot-consumer-end.png)
-8. Go back to Gladly. Note that the conversation has been closed automatically by this app, and the topic you set up in Step 2.6 has been assigned.
+7. Go back to Gladly. Note that the conversation has been closed automatically by this app, and the topic you set up in Step 2.6 has been assigned.
 ![](./tutorial-images/chatbot-agent-end.png)
-9. Go back to the chat preview link. Type in `agent`. Notice that no auto-reply occurs!
+8. Go back to the chat preview link. Type in `agent`. Notice that no auto-reply occurs!
 ![](./tutorial-images/chatbot-consumer-handoff.png)
-10. Go back to Gladly. Notice that the conversation has been reopened due to you re-initiating the chat, and that this app has added the topic you configured in Step 2.5 in, and reassigned the conversation to the inbox you configured in Step 2.1.
+9. Go back to Gladly. Notice that the conversation has been reopened due to you re-initiating the chat, and that this app has added the topic you configured in Step 2.5 in, and reassigned the conversation to the inbox you configured in Step 2.1.
 ![](./tutorial-images/chatbot-agent-handoff.png)
-11. Go back to the chat preview link and type in anything you'd like. Notice that the bot has stopped responding!
+10. Go back to the chat preview link and type in anything you'd like. Notice that the bot has stopped responding!
 
 ### How it accomplishes this
 
