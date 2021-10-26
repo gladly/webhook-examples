@@ -68,7 +68,7 @@ module.exports = () => {
           }).catch((e) => {
             console.log(`[${dayjs().format('YYYY-MM-DD HH:mm:ss')}] Could not move ${thisConversationId} to ${process.env.CHATBOT_MOVE_TO_INBOX_ID} or add topic ID ${process.env.CHATBOT_EXCLUDE_TOPIC_ID} due to ${JSON.stringify(e)}`);
           });
-        } else if (conversationItem.content.content.toLowerCase().indexOf('we are done now') != -1) {
+        } else if (conversationItem.content.content.toLowerCase().indexOf('goodbye') != -1) {
           addTopic(thisConversationId, { topicIds: [process.env.CHATBOT_DEFAULT_TOPIC_ID] })
           .then(() => {
             return updateConversation(thisConversationId, {
@@ -90,6 +90,55 @@ module.exports = () => {
 
             res.sendStatus(500);
           });
+        } else if (conversationItem.content.content.toLowerCase().indexOf('show me quick reply buttons') != -1) {
+          Promise.all([
+            updateConversation(thisConversationId, {
+              assignee: {
+                agentId: process.env.CHATBOT_AGENT_ID,
+                inboxId: conversation.inboxId
+              }, status: {
+                value: 'OPEN',
+                force: true
+              }
+            }),
+            replyToMessage(thisConversationItemId, {
+              content: {
+                type: 'CHAT_MESSAGE',
+                messageType: 'QUICK_REPLY_REQUEST',
+                body: `Please pick from the following options:`,
+                messageData: {
+                  options: [
+                    {
+                      id: '1',
+                      label: 'agent'
+                    },
+                    {
+                      id: '2',
+                      label: 'show me quick reply buttons'
+                    },
+                    {
+                      id: '3',
+                      label: 'a random message'
+                    },
+                    {
+                      id: '4',
+                      label: 'goodbye'
+                    }
+                  ]
+                }
+              }
+            })
+          ]).then(() => {
+            console.log(`[${dayjs().format('YYYY-MM-DD HH:mm:ss')}] Sent reply to ${thisConversationId} and reassigned conversation to ${process.env.CHATBOT_AGENT_ID}`);
+
+            res.sendStatus(200);
+          }).catch((e) => {
+            console.log(e.response.data);
+
+            console.log(`[${dayjs().format('YYYY-MM-DD HH:mm:ss')}] Could not reply to ${thisConversationId} due to ${JSON.stringify(e)}`);
+
+            res.sendStatus(500);
+          });
         } else {
           Promise.all([
             updateConversation(thisConversationId, {
@@ -105,7 +154,7 @@ module.exports = () => {
               content: {
                 type: 'CHAT_MESSAGE',
                 messageType: 'TEXT',
-                body: `thank you for contacting us. reply "agent" to be directed to an agent. reply "we are done now" to close this chat session.`
+                body: `Thank you for contacting us. Reply "agent" to be directed to an agent. Reply "goodbye" to close this chat session. Reply "show me quick reply buttons" to see quick reply buttons.`
               }
             })
           ]).then(() => {
