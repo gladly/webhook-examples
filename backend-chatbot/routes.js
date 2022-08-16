@@ -4,7 +4,6 @@ const dayjs = require('dayjs');
 const { sendOutboundAutomationMessage, getAutomationSessionMessages, handoffToAgent } = require('../util/api');
 require('dotenv').config();
 const slugid = require('slugid');
-const _ = require('lodash');
 
 module.exports = () => {
   const router = express.Router();
