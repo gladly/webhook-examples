@@ -1,8 +1,9 @@
 //Require libraries to enable this application
 const express = require('express');
 const dayjs = require('dayjs');
-const { getConversation, addTopic, getConversationItem, updateConversation, replyToMessage, getTopics, listAgents } = require('../util/api');
+const { sendOutboundAutomationMessage, getAutomationSessionMessages, handoffToAgent } = require('../util/api');
 require('dotenv').config();
+const slugid = require('slugid');
 
 module.exports = () => {
   const router = express.Router();
@@ -16,168 +17,51 @@ module.exports = () => {
 
       return res.sendStatus(200);
     }
-    else if(req.body.type != 'MESSAGE/RECEIVED') {
-      console.log(`[${dayjs().format('YYYY-MM-DD HH:mm:ss')}] Not processing webhook as this was not a MESSAGE/RECEIVED event`);
+    else if(req.body.type != 'AUTOMATION/MESSAGE_RECEIVED') {
+      console.log(`[${dayjs().format('YYYY-MM-DD HH:mm:ss')}] Not processing webhook as this was not a AUTOMATION/MESSAGE_RECEIVED event`);
 
       return res.sendStatus(500);
     }
 
-    let thisConversationId = req.body.content.conversationId;
-    let thisConversationItemId = req.body.content.conversationItemId;
+    let thisMessageBody = req.body.content.message.content.body;
+    let thisSessionId = req.body.content.sessionId;
 
-    getConversation(thisConversationId)
-    .then((conversation) => {
-      conversation = conversation.data;
+    if(thisMessageBody.toLowerCase().indexOf('agent') != -1) {
+      //hand off to agent
+      getAutomationSessionMessages(thisSessionId)
+      .then((sessionMessages) => {
+        handoffToAgent(thisSessionId, {
+          description: `Bot handed off interaction after ${sessionMessages.data.length} messages`
+        })
+        .then(() => {
+          return res.sendStatus(200);
+        }).catch((e) => {
+          console.log(`[${dayjs().format('YYYY-MM-DD HH:mm:ss')}] Could not send close automation session due to ${JSON.stringify(e)}`);
 
-      //If conversation is currently CLOSED, no need to process this request
-      if(conversation.status == 'CLOSED') {
-          console.log(`[${dayjs().format('YYYY-MM-DD HH:mm:ss')}] Not processing ${thisConversationId} as this conversation is currently closed`);
-
-        return res.sendStatus(200);
-      }
-
-      //If CHATBOT_EXCLUDE_TOPIC_NAME is applied, do not process this message, and move on
-      let hasSkipTopic = (conversation.topicIds && conversation.topicIds.length) ? (conversation.topicIds).filter(t => { return t == process.env.CHATBOT_EXCLUDE_TOPIC_ID }) : false;
-      if(hasSkipTopic && hasSkipTopic.length) {
-          console.log(`[${dayjs().format('YYYY-MM-DD HH:mm:ss')}] Not processing ${thisConversationId} as topic ID ${process.env.CHATBOT_EXCLUDE_TOPIC_ID} is added to this conversation`);
-
-        return res.sendStatus(200);
-      }
-
-      getConversationItem(thisConversationItemId)
-      .then((conversationItem) => {
-        conversationItem = conversationItem.data;
-
-        //If it's not a chat message, OR if it contains the word "agent" in the message, move it to another inbox and add the exclude topic ID
-        if(conversationItem.content.type != 'CHAT_MESSAGE' || conversationItem.content.content.toLowerCase().indexOf('agent') != -1) {
-          Promise.all([
-            addTopic(thisConversationId, { topicIds: [process.env.CHATBOT_EXCLUDE_TOPIC_ID] }),
-            updateConversation(thisConversationId, {
-              assignee: {
-                agentId: '',
-                inboxId: process.env.CHATBOT_MOVE_TO_INBOX_ID
-              }, status: {
-                value: 'OPEN',
-                force: true
-              }
-            })
-          ]).then(() => {
-            console.log(`[${dayjs().format('YYYY-MM-DD HH:mm:ss')}] Reassigned ${thisConversationId} to inbox ID ${process.env.CHATBOT_MOVE_TO_INBOX_ID} and added topic ID ${process.env.CHATBOT_EXCLUDE_TOPIC_ID}`);
-
-            res.sendStatus(200);
-          }).catch((e) => {
-            console.log(`[${dayjs().format('YYYY-MM-DD HH:mm:ss')}] Could not move ${thisConversationId} to ${process.env.CHATBOT_MOVE_TO_INBOX_ID} or add topic ID ${process.env.CHATBOT_EXCLUDE_TOPIC_ID} due to ${JSON.stringify(e)}`);
-          });
-        } else if (conversationItem.content.content.toLowerCase().indexOf('goodbye') != -1) {
-          addTopic(thisConversationId, { topicIds: [process.env.CHATBOT_DEFAULT_TOPIC_ID] })
-          .then(() => {
-            return updateConversation(thisConversationId, {
-              status: {
-                value: 'CLOSED',
-                force: true
-              },
-              assignee: {
-                agentId: process.env.CHATBOT_AGENT_ID,
-                inboxId: conversation.inboxId
-              }
-            })
-          }).then(() => {
-            console.log(`[${dayjs().format('YYYY-MM-DD HH:mm:ss')}] Closed conversation ${thisConversationId} and added topic ID ${process.env.CHATBOT_DEFAULT_TOPIC_ID}`);
-
-            res.sendStatus(200);
-          }).catch((e) => {
-            console.log(`[${dayjs().format('YYYY-MM-DD HH:mm:ss')}] Could not close conversation due to ${JSON.stringify(e)}`);
-
-            res.sendStatus(500);
-          });
-        } else if (conversationItem.content.content.toLowerCase().indexOf('show me quick reply buttons') != -1) {
-          Promise.all([
-            updateConversation(thisConversationId, {
-              assignee: {
-                agentId: process.env.CHATBOT_AGENT_ID,
-                inboxId: conversation.inboxId
-              }, status: {
-                value: 'OPEN',
-                force: true
-              }
-            }),
-            replyToMessage(thisConversationItemId, {
-              content: {
-                type: 'CHAT_MESSAGE',
-                messageType: 'QUICK_REPLY_REQUEST',
-                body: `Please pick from the following options:`,
-                messageData: {
-                  options: [
-                    {
-                      id: '1',
-                      label: 'agent'
-                    },
-                    {
-                      id: '2',
-                      label: 'show me quick reply buttons'
-                    },
-                    {
-                      id: '3',
-                      label: 'a random message'
-                    },
-                    {
-                      id: '4',
-                      label: 'goodbye'
-                    }
-                  ]
-                }
-              }
-            })
-          ]).then(() => {
-            console.log(`[${dayjs().format('YYYY-MM-DD HH:mm:ss')}] Sent reply to ${thisConversationId} and reassigned conversation to ${process.env.CHATBOT_AGENT_ID}`);
-
-            res.sendStatus(200);
-          }).catch((e) => {
-            console.log(e.response.data);
-
-            console.log(`[${dayjs().format('YYYY-MM-DD HH:mm:ss')}] Could not reply to ${thisConversationId} due to ${JSON.stringify(e)}`);
-
-            res.sendStatus(500);
-          });
-        } else {
-          Promise.all([
-            updateConversation(thisConversationId, {
-              assignee: {
-                agentId: process.env.CHATBOT_AGENT_ID,
-                inboxId: conversation.inboxId
-              }, status: {
-                value: 'OPEN',
-                force: true
-              }
-            }),
-            replyToMessage(thisConversationItemId, {
-              content: {
-                type: 'CHAT_MESSAGE',
-                messageType: 'TEXT',
-                body: `Thank you for contacting us. Reply "agent" to be directed to an agent. Reply "goodbye" to close this chat session. Reply "show me quick reply buttons" to see quick reply buttons.`
-              }
-            })
-          ]).then(() => {
-            console.log(`[${dayjs().format('YYYY-MM-DD HH:mm:ss')}] Sent reply to ${thisConversationId} and reassigned conversation to ${process.env.CHATBOT_AGENT_ID}`);
-
-            res.sendStatus(200);
-          }).catch((e) => {
-            console.log(`[${dayjs().format('YYYY-MM-DD HH:mm:ss')}] Could not reply to ${thisConversationId} due to ${JSON.stringify(e)}`);
-
-            res.sendStatus(500);
-          });
-        }
+          //don't try again
+          return res.sendStatus(406);
+        })
       }).catch((e) => {
-        console.log(`[${dayjs().format('YYYY-MM-DD HH:mm:ss')}] Could not retrieve details on conversation item ID: ${thisConversationItemId} due to ${JSON.stringify(e)}`);
+        console.log(`[${dayjs().format('YYYY-MM-DD HH:mm:ss')}] Could not send retrieve session's automation messages due to ${JSON.stringify(e)}`);
 
-        res.sendStatus(500);
+        //don't try again
+        return res.sendStatus(406);
       })
-    })
-    .catch((e) => {
-      console.log(`[${dayjs().format('YYYY-MM-DD HH:mm:ss')}] Could not retrieve details on conversation ID ${thisConversationId} due to ${JSON.stringify(e)}`);
+    } else {
+      sendOutboundAutomationMessage(thisSessionId, {
+        type: 'TEXT',
+        content: {
+          value: `Random message: ${slugid.nice()}. Type agent if you want to be handed off to an agent.`
+        }
+      }).then(() => {
+        return res.sendStatus(200);
+      }).catch((e) => {
+        console.log(`[${dayjs().format('YYYY-MM-DD HH:mm:ss')}] Could not send outbound automation message due to ${JSON.stringify(e)}`);
 
-      res.sendStatus(500);
-    });
+        //don't try again
+        return res.sendStatus(406);
+      })
+    }
   });
 
   return router;
