@@ -64,3 +64,15 @@ module.exports.getItems = function(id) {
 module.exports.addTopic = function(id, payload) {
   return gladlyApiRequest('POST', `/api/v1/conversations/${id}/topics`, payload);
 }
+
+module.exports.handoffToAgent = function(sessionId, payload) {
+  return gladlyApiRequest('POST', `/api/v1/message-automation/sessions/${sessionId}/handoff`, payload)
+}
+
+module.exports.getAutomationSessionMessages = function(sessionId) {
+  return gladlyApiRequest('GET', `/api/v1/message-automation/sessions/${sessionId}/messages`)
+}
+
+module.exports.sendOutboundAutomationMessage = function(sessionId, payload) {
+  return gladlyApiRequest('POST', `/api/v1/message-automation/sessions/${sessionId}/messages`, payload)
+}
