@@ -16,10 +16,15 @@ To run the apps in this tutorial, you'll need to set up a few other things in Gl
 
 ### Backend Chatbot
 1. [Create a Gladly Sidekick](https://help.gladly.com/docs/create-and-configure-sidekick), setting the hours to 24/7 and enabling messaging automation. Click on [View Preview](https://help.gladly.com/docs/create-and-configure-sidekick#preview-and-embed-sidekick) to get a link to preview and interact with your Sidekick.
-2. In the Channel Settings page, [route chat messages to an inbox where your Agents are staffed in](https://help.gladly.com/docs/set-up-channels-and-entry-points#route-requests-to-a-particular-inbox-based-on-the-entry-point)
+2. In the Settings > Entry Points page, [route chat messages to an inbox where your Agents are staffed in](https://help.gladly.com/docs/set-up-channels-and-entry-points#route-requests-to-a-particular-inbox-based-on-the-entry-point)
 
 ### CSAT Survey
-8. Create a [messaging webhook URL](https://api.slack.com/messaging/webhooks) for a Slack channel of your choice and save this to a safe space
+1. Create a [messaging webhook URL](https://api.slack.com/messaging/webhooks) for a Slack channel of your choice and save this to a safe space
+
+### Reply to Message
+1. [Create a Gladly Email Address](https://help.gladly.com/docs/add-email-address).
+2. In the Settings > Entry Points page, [route email messages to an inbox where your Agents are staffed in](https://help.gladly.com/docs/set-up-channels-and-entry-points#route-requests-to-a-particular-inbox-based-on-the-entry-point)
+3. Assign your API User to that inbox
 
 ## Step 3: Setup .env file
 
@@ -30,6 +35,7 @@ Set the following:
 - `GLADLY_USERNAME`: Your Gladly developer email address (e.g.: gladlyadmin@gladly.com)
 - `GLADLY_API_TOKEN`: The API token that you generated in Step 1
 - `CSAT_SLACK_WEBHOOK`: The Slack webhook URL you copied in Step 2.8
+- `GLADLY_APP_BOT_AGENT_ID`: The Gladly API User Agent ID
 
 Save the file
 
@@ -79,6 +85,35 @@ In a nutshell, this application allows you to embed Gladly Sidekick on your fron
 6. Otherwise, the app will retrieve all previous messages sent back and forth in this interaction using the `GET` `Get Automation Messages` API and then use the response to compile a transcript of the bot and human interaction.
 7. The app will then call `POST` `Agent Handoff` and populate `description` with the description compiled in step #6. At this point, the chat will be available for routing in an inbox to an Agent.
 7. Otherwise, the app will retrieve the conversation item details using the webhook's `content.conversationItemId` field and the [Get Conversation Item](https://developer.gladly.com/rest/#operation/getItem) API.
+
+## Reply to Message
+
+### What this does
+
+In a nutshell, this application allows you to respond to written messages from other chanenls (e.g.: Email, Twitter, Facebook, WhatsApp) using a back-end bot. When the bot determines it needs to pass off the interaction to a real human, the bot hands the conversation off to an Agent in its current inbox.
+
+### Running this app
+
+1. Open up Terminal. In the root directory of this repository, type in `node reply-to-message`
+2. In a new tab on Terminal, type in `ngrok http 8000` and copy the HTTPS link
+3. Go to `More Settings > Webhooks` in Gladly and create a webhook for `CONTACT/MESSAGE_RECEIVED` using the HTTPS link you just copied. Leave all other fields blank - you can name this webhook whatever you'd like.
+
+### Testing
+
+1. Email the email address you set up above.
+2. You will then receive an automated response with the following text: `Thank you for your message!`. This is a message sent by the backend chatbot! If you check in Gladly, the Conversation will be assigned to the Gladly API User Agent you set up above.
+3. Send back the word `Agent`. You will then receive a message: `Handing you off!`.
+4. You will see the Conversation is now assigned to the inbox as opposed to the backend chatbot.
+
+### How it accomplishes this
+
+1. The app listens to the `CONTACT/MESSAGE_RECEIVED` or `PING` webhook `POST` requests made by Gladly
+2. If it receives any other type of webhook, it stops processing the request and sends back a `500` HTTP status code
+3. If it is a `PING` webhook, it will respond back with HTTP 200. This is Gladly's way of checking if the webhook is alive. Gladly will not allow you to save the webhook in the Gladly UI **if your app does not send back a HTTP 200 OK status code** on the `PING` event
+4. Otherwise, upon `CONTACT/MESSAGE_RECEIVED`, the app will check for the value in `content.context.assignee.agentId`. If it is blank, the App will reassign it to the API User Agent ID using [Update Conversation](https://developer.gladly.com/rest/#operation/patchConversation) API. Then, it will proceed with the below. Note: if it is currently assigned to the API User Agent ID, it will also proceed with the below logic - but if it is currently assign to anyone other than the API User Agent ID, it will do nothing.
+5. The App will then retrieve the message sent using the [Get Item](https://developer.gladly.com/rest/#operation/getItem) API.
+6. If the body does not contain the word `Agent`, it will send a static message `Thank you for your message!` to the customer using the [Reply to Message API](https://developer.gladly.com/rest/#operation/replyToMessage).
+7. Otherwise, the app will send `Handing you off!` to the customer via the [Reply to Message API](https://developer.gladly.com/rest/#operation/replyToMessage) and assign the Conversation back to the inbox using [Update Conversation API](https://developer.gladly.com/rest/#operation/patchConversation).
 
 ## CSAT Survey
 
