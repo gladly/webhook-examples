@@ -51,7 +51,7 @@ module.exports = () => {
       sendOutboundAutomationMessage(thisSessionId, {
         type: 'TEXT',
         content: {
-          value: `Random message: ${slugid.nice()}. Type agent if you want to be handed off to an agent.`
+          value: `Random message: ${slugid.nice()}.\n\nPlease click on this link, then say yes.\n\nhttps://www.google.com`
         }
       }).then(() => {
         return res.sendStatus(200);
